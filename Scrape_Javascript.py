@@ -1,6 +1,7 @@
 # import libraries
 from typing import KeysView
 import urllib.request
+from pydantic import Json
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -115,7 +116,6 @@ def scrape_forever21():
     time.sleep(5)
     r = requests.get(url)
     
-    
     driver.maximize_window()
     time.sleep(1)
 
@@ -130,15 +130,12 @@ def scrape_forever21():
             htmlSource = driver.page_source
             soup = BeautifulSoup(htmlSource, 'html.parser')
             if soup.find("div",class_="sc-fznxsB kWAcuz sc-fznMAR kvbDRc privy-widget-popup"):
-
+                driver.find_element_by_css_selector('sc-fzoiQi ozSmQ privy-dismiss-content').click()
                 # closebutton = driver.find_element_by_id("Oval")
                 # closebutton.click()
-                break
             else:
-                print("popup not found")
-                
+                print("popup not found")    
             
-
         count = count+1
         time.sleep(1)
         new_height = driver.execute_script("return document.body.scrollHeight")
@@ -155,45 +152,46 @@ def scrape_forever21():
 
     products = soup.find_all('div', class_ = "grid-item col-6 col-md-4 col-lg-3")
     print(len(products))
-    links = []
     titles = []
-    old_prices = []
-    new_prices = []
-    discount_percents = []
     ImageLinks = []
     temp_list = []
     for product in products:
-        JsonObject = product.find('div',class_="inner product-item on-sale")
-        with open('Test.txt','w') as f:
-            f.write(str(JsonObject))
-        break
-        # link = product.find('a', class_="product-title change-text",href=True)['href']
-        # links.append("https://forever21.sg/" + link)
+        # JsonObject = product.find('div',class_="inner product-item on-sale")
         
-        # fulltitle = product.find('a',class_="product-title change-text") yeet
-        # title = fulltitle.find('span').text.strip()
-        # titleAddon = fulltitle.find_all('span')[1].text
-        # CombinedTitle = title+ titleAddon
+        link = product.find('a', class_="product-title change-text",href=True)['href']
+        link1 = "https://forever21.sg/" + link
         
-        # titles.append(title+titleAddon)
+        #Takin
+        fulltitle = product.find('a',class_="product-title change-text") 
+        title = fulltitle.find('span').text.strip()
+        titleAddon = fulltitle.find_all('span')[1].text
+        CombinedTitle = title+ titleAddon
+        titles.append(title+titleAddon)
         
-        # images = product.find_all("picture")
-        
-        # image = images[0].find_all("source")[0].attrs['data-srcset']
-        # ImageLinks.append(image)
+        #Take Image Link
+        images = product.find_all("picture")
+        image = images[0].find_all("source")[0].attrs['data-srcset']
+        ImageLinks.append(image)
 
-        # pricelist = product.find("div",class_="price-regular")
-        # newprice = pricelist.text.strip()
-        # new_prices.append(newprice)
-        # # old_price = pricelist.find('span',class_="old-price").text
-        # # old_prices.append(old_price)
-        # # discount_percent = round(float(old_price.strip("$"))-float(new_price.strip("$"))/float(old_price.strip("$"))*100)
-        # # discount_percents.append(discount_percent)
-    
-        # temp = {"author": url, "title":CombinedTitle, "link": link, "tags": "Forever 21", "scrapedPostImage":image, "New Price":newprice}
-        # temp_list.append(temp)
+        try:
+
+            pricelist = product.find("div",class_="price-regular")
+            newprice = pricelist.text.strip()
+            old_price = ""
+            discount_percent = ""
+            
+        except:
+            pricelist = product.find("div",class_="price-sale")
+            old_price = pricelist.find('span',class_="old-price").text
+            newprice = pricelist.find('span',class_='special-price').text
+            discount_percent = round((float(old_price.strip("$"))-float(newprice.strip("$")))/float(old_price.strip("$"))*100)
+            discount_percent1 = str(abs(discount_percent)) + "%"
+        temp = {"author": url, "title":CombinedTitle, "link": link1, "tags": "Forever 21", "scrapedPostImage":image, "New Price":newprice, "Old Price":old_price, "Discount Percent":discount_percent1}
+        temp_list.append(temp)
     
     driver.close()
+
+    print(temp_list)
     return
 
 scrape_forever21()
