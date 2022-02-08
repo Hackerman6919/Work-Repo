@@ -170,7 +170,7 @@ def scrape_forever21():
         # link = product.find('a', class_="product-title change-text",href=True)['href']
         # links.append("https://forever21.sg/" + link)
         
-        # fulltitle = product.find('a',class_="product-title change-text")
+        # fulltitle = product.find('a',class_="product-title change-text") yeet
         # title = fulltitle.find('span').text.strip()
         # titleAddon = fulltitle.find_all('span')[1].text
         # CombinedTitle = title+ titleAddon
@@ -185,7 +185,6 @@ def scrape_forever21():
         # pricelist = product.find("div",class_="price-regular")
         # newprice = pricelist.text.strip()
         # new_prices.append(newprice)
-
         # # old_price = pricelist.find('span',class_="old-price").text
         # # old_prices.append(old_price)
         # # discount_percent = round(float(old_price.strip("$"))-float(new_price.strip("$"))/float(old_price.strip("$"))*100)
