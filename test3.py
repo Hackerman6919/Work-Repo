@@ -1,0 +1,4 @@
+Category_Dict = {"tops":"https://www.asos.com/men/sale/cat/?cid=8409&currentpricerange=0-725&nlid=mw%7Csale%7Cshop%20sale%20by%20product%7Csale%20view%20all&refine=attribute_10992:61380,61383", "bottoms":"https://www.asos.com/men/sale/cat/?cid=8409&currentpricerange=0-725&nlid=mw%7Csale%7Cshop%20sale%20by%20product%7Csale%20view%20all&refine=attribute_10992:61375,61377","footwear":"https://www.asos.com/men/sale/cat/?cid=8409&currentpricerange=0-725&nlid=mw%7Csale%7Cshop%20sale%20by%20product%7Csale%20view%20all&refine=attribute_10992:61388","accessories":"https://www.asos.com/men/sale/cat/?cid=8409&currentpricerange=0-725&nlid=mw%7Csale%7Cshop%20sale%20by%20product%7Csale%20view%20all&refine=attribute_10992:61384,61387","suits and blazers":"https://www.asos.com/men/sale/cat/?cid=8409&currentpricerange=0-725&nlid=mw%7Csale%7Cshop%20sale%20by%20product%7Csale%20view%20all&refine=attribute_10992:61467"}
+
+for i in Category_Dict:
+    print(Category_Dict[i])

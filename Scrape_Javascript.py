@@ -1,7 +1,7 @@
 # import libraries
+from logging import exception
 from typing import KeysView
 import urllib.request
-from pydantic import Json
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -9,104 +9,403 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 import time
 import pandas as pd
+import re
 
-# specify the url
-
-def scrape_nike():
-    driver = webdriver.Chrome(executable_path=r"D:\DOWNLOADS\Chrome Driver\chromedriver_win32\chromedriver.exe")
-    url = 'https://www.nike.com/sg/w/sale-3yaep'
+def scrape_asos_men_accessories():
+    driver = webdriver.Chrome(executable_path=r"D:\DOWNLOADS\ChromeDriver\chromedriver_win32\chromedriver.exe")
+    url = 'https://www.asos.com/men/sale/cat/?cid=8409&currentpricerange=0-725&refine=attribute_10992:61384'
     driver.get(url)
-    time.sleep(5)
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
+    r = requests.get(url,headers=headers)
+                                    
+    driver.maximize_window()
+
     htmlSource = driver.page_source
-    r = requests.get(url)
-    soup = BeautifulSoup(r.content, 'html.parser')
+    soup = BeautifulSoup(htmlSource, 'html.parser')
+    
+    reached_page_end = False
+    test_counter_to_remove = 0
 
-    products = soup.find_all('div', class_ = "product-card__body")
-    links = []
-    titles = []
-    old_prices = []
-    new_prices = []
-    discount_percents = []
-    for product in products:
-        title = product.find('a').text
-        titles.append(title)
+    while reached_page_end == False and test_counter_to_remove <=1:
+        for i in range(0,30):
+            ActionChains(driver).send_keys(Keys.PAGE_DOWN).perform()
+        time.sleep(2)
+        if bool(soup.find_all("a",class_="_39_qNys")) == True:
+            driver.find_element_by_class_name('_39_qNys').click()
+            time.sleep(1)
+            test_counter_to_remove +=1
 
-        link = product.find('a',href=True)['href']
-        links.append(link)
-        
-        price_container = product.find('div',class_='product-card__animation_wrapper')
-        old_price = price_container.find('div',class_="product-price is--striked-out").text.strip('S$')
-        old_prices.append(old_price)
+        else:
+            reached_page_end = True
+            
+    htmlSource = driver.page_source
+    soup = BeautifulSoup(htmlSource, 'html.parser')
 
-        new_price = price_container.find('div',class_="product-price is--current-price css-s56yt7").text.strip('S$')
+    sections = soup.find_all("section",class_="_3YREj-P")
+    products = []
+    for i in sections:
+        product = i.find_all("article",class_="_2qG85dG")
+        for z in product:
+            products.append(z)
 
-        new_prices.append(new_price)
+    TempCollated = []
+    error_links = []
+    error = 0
+    for i in products: 
+        try:
+            Product_Link = i.find('a',class_="_3TqU78D",href=True)['href']
+            # print(Product_Link)
+            driver.get(Product_Link)
+            htmlSource = driver.page_source
+            soup = BeautifulSoup(htmlSource,'html.parser')
 
-        discount_percent = round((float(old_price)-float(new_price))/float(old_price)*100)
-        discount_percents.append(discount_percent)
+            product_info = soup.find('div',class_="product-hero").text #soup .find not = None, use if else statement, do an else to find another type of class that can show product info
+            product_info1 = str(product_info).split("\n")
+            while("" in product_info1) :
+                product_info1.remove("")
+            
+            Product_title = product_info1[0]
 
-    print(old_prices)
+            product_prices = product_info1[1]
+            prices_list = [float(s) for s in re.findall(r'-?\d+\.?\d*', product_prices)]
+            Old_price = prices_list[0]
+
+            New_price = prices_list[1]
+
+            Discount = abs(prices_list[2])
+
+            Colour = soup.find('span',class_="product-colour").text
+            Image = soup.find("img",class_="gallery-image")['src']
+
+            Product_Descriptions = soup.find("div",class_="product-description")
+            if len(Product_Descriptions.find_all('a',href=True)) == 1:
+
+                Product_Descriptions_split = str(BeautifulSoup(Product_Descriptions.prettify().split("<br/>")[0],"html.parser").text).split("\n")
+                Apparel_and_Brand = []
+                for string in Product_Descriptions_split:
+                    if (string.strip() != ""):
+                        Apparel_and_Brand.append(string.strip())
+                Apparel = Apparel_and_Brand[1]
+                FullBrand = Apparel_and_Brand[2]
+                Brand = FullBrand[3:]
+            
+            else:
+                product_description1 = Product_Descriptions.find_all('a',href=True)
+                prdouct_description = []
+                for x in product_description1:
+                    prdouct_description.append(x.text)
+                print(prdouct_description)
+                Apparel = prdouct_description[0]
+                Brand = prdouct_description[1]
+            Styles = ["Cropped","Cut Out", "Denim","Grandada Collar", "Jersey Shorts", "Longline", "Muscle", "Novelty", "Other", "Overshirts", "Oversized", "Oxford","Racer Back","Raglan","Regular fit","Raglan","Relaxed","Shackets","Skinny","Slim","Sports Shorts","Straight Leg","Tapered","Track","Western"]
+            
+            temp = {"author": url, "title":Product_title, "link": Product_Link, "tags": Brand, "scrapedPostImage":Image, "new Price":New_price, "old Price":Old_price, "discount Percent":Discount, "colour":Colour, "apparel":Apparel }
+            TempCollated.append(temp)
+        except Exception as e:
+            error += 1
+            error_Link = i.find('a',class_="_3TqU78D",href=True)['href']
+            error_links.append(error_Link)
+            continue
+
+    print(error_links)
+    print(len(error_links))
+    print(len(TempCollated))
+    print(TempCollated[0])
     driver.close()
     return
-# scrape_nike()
 
-def scrape_uniqlo_women():
-    driver = webdriver.Chrome(executable_path=r'D:\DOWNLOADS\Chrome Driver\chromedriver_win32\chromedriver.exe')
-    url = 'https://www.uniqlo.com/sg/en/feature/limited-offers/women'
+scrape_asos_men_accessories()
+
+print("\n")
+
+def scrape_asos_men_shirts():
+    driver = webdriver.Chrome(executable_path=r"D:\DOWNLOADS\ChromeDriver\chromedriver_win32\chromedriver.exe")
+    url = 'https://www.asos.com/men/sale/cat/?cid=8409&currentpricerange=0-725&refine=attribute_10992:61383'
     driver.get(url)
-    time.sleep(5)
-    htmlSource = driver.page_source
-    r = requests.get(url)
-    soup = BeautifulSoup(r.content, 'html.parser')
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
+    r = requests.get(url,headers=headers)
+    
+    driver.maximize_window()
 
-    products = soup.find_all('div', class_ = "fr-grid-item w4")
-    print(products)
-    links = []
-    titles = []
-    old_prices = []
-    new_prices = []
-    discount_percents = []
-    #for product in products:
+    htmlSource = driver.page_source
+    soup = BeautifulSoup(htmlSource, 'html.parser')
+    
+    reached_page_end = False
+    test_counter_to_remove = 0
+
+    while reached_page_end == False and test_counter_to_remove <=1:
+        for i in range(0,30):
+            ActionChains(driver).send_keys(Keys.PAGE_DOWN).perform()
+        time.sleep(2)
+        if bool(soup.find_all("a",class_="_39_qNys")) == True:
+            driver.find_element_by_class_name('_39_qNys').click()
+            time.sleep(1)
+            test_counter_to_remove +=1
+
+        else:
+            reached_page_end = True
+            
+    htmlSource = driver.page_source
+    soup = BeautifulSoup(htmlSource, 'html.parser')
+
+    sections = soup.find_all("section",class_="_3YREj-P")
+    products = []
+    for i in sections:
+        product = i.find_all("article",class_="_2qG85dG")
+        for z in product:
+            products.append(z)
+
+    TempCollated = []
+    error_links = []
+    error = 0
+    for i in products: 
+        try:
+            Product_Link = i.find('a',class_="_3TqU78D",href=True)['href']
+            # print(Product_Link)
+            driver.get(Product_Link)
+            htmlSource = driver.page_source
+            soup = BeautifulSoup(htmlSource,'html.parser')
+
+            product_info = soup.find('div',class_="product-hero").text #soup .find not = None, use if else statement, do an else to find another type of class that can show product info
+            product_info1 = str(product_info).split("\n")
+            while("" in product_info1) :
+                product_info1.remove("")
+            
+            Product_title = product_info1[0]
+
+            product_prices = product_info1[1]
+            prices_list = [float(s) for s in re.findall(r'-?\d+\.?\d*', product_prices)]
+            Old_price = prices_list[0]
+
+            New_price = prices_list[1]
+
+            Discount = abs(prices_list[2])
+
+            Colour = soup.find('span',class_="product-colour").text
+            
+            Product_Descriptions = soup.find("div",class_="product-description")
+            
+            product_description1 = Product_Descriptions.find_all('a',href=True)
+            
+            prdouct_description = []
+            for x in product_description1:
+                prdouct_description.append(x.text)
+            
+            Apparel = prdouct_description[0]
+            Brand = prdouct_description[1]
+
+            Image = soup.find("img",class_="gallery-image")['src']
+            
+            temp = {"author": url, "title":Product_title, "link": Product_Link, "tags": Brand, "scrapedPostImage":Image, "new Price":New_price, "old Price":Old_price, "discount Percent":Discount, "colour":Colour, "apparel":Apparel }
+            TempCollated.append(temp)
+        except Exception as e:
+            error += 1
+            error_Link = i.find('a',class_="_3TqU78D",href=True)['href']
+            error_links.append(error_Link)
+            continue
+
+    print(error_links)
+    print(len(error_links))
+    print(len(TempCollated))
+    print(TempCollated[0])
     driver.close()
     return
 
-# scrape_uniqlo_women()
+scrape_asos_men_shirts()
 
+print("\n")
 
-
-# Link not working
-def scrape_asos():
-    driver = webdriver.Chrome(executable_path=r"D:\DOWNLOADS\Chrome Driver\chromedriver_win32\chromedriver.exe")
-    url = 'https://www.asos.com/women/sale/cat/?cid=7046&nlid=ww%7Csale%7Cshop%20sale%20by%20product%7Csale%20view%20all&page=2'
+def scrape_asos_men_bottom():
+    driver = webdriver.Chrome(executable_path=r"D:\DOWNLOADS\ChromeDriver\chromedriver_win32\chromedriver.exe")
+    url = 'https://www.asos.com/men/sale/cat/?cid=8409&currentpricerange=0-725&nlid=mw%7Csale%7Cshop%20sale%20by%20product%7Csale%20view%20all&refine=attribute_10992:61375,61377'
     driver.get(url)
-    time.sleep(5)
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
+    r = requests.get(url,headers=headers)
+    
+    driver.maximize_window()
+
     htmlSource = driver.page_source
-    r = requests.get(url)
-    soup = BeautifulSoup(r.content, 'html.parser')
+    soup = BeautifulSoup(htmlSource, 'html.parser')
+    
+    reached_page_end = False
+    test_counter_to_remove = 0
 
-    products = soup.find_all('div', class_ = "product-card-content-badges-wrapper___2brrU")
-    links = []
-    titles = []
-    old_prices = []
-    new_prices = []
-    discount_percents = []
-    for product in products:
-        title = product.find('gl-paragraph gl-paragraph--s gl-product-card__title').text
-        titles.append(title)
+    while reached_page_end == False and test_counter_to_remove <=1:
+        for i in range(0,30):
+            ActionChains(driver).send_keys(Keys.PAGE_DOWN).perform()
+        time.sleep(2)
+        if bool(soup.find_all("a",class_="_39_qNys")) == True:
+            driver.find_element_by_class_name('_39_qNys').click()
+            time.sleep(1)
+            test_counter_to_remove +=1
 
-        # price_container = product.find('div',class_='product-card__animation_wrapper')
-        old_price = product.find('div',class_="gl-price-item gl-price-item--crossed notranslate").text.strip('S$')
-        old_prices.append(old_price)
+        else:
+            reached_page_end = True
+            
+    htmlSource = driver.page_source
+    soup = BeautifulSoup(htmlSource, 'html.parser')
 
-        new_price = product.find('div',class_="gl-price-item gl-price-item--sale notranslate").text.strip('S$')
+    sections = soup.find_all("section",class_="_3YREj-P")
+    products = []
+    for i in sections:
+        product = i.find_all("article",class_="_2qG85dG")
+        for z in product:
+            products.append(z)
 
-        new_prices.append(new_price)
+    TempCollated = []
+    error_links = []
+    error = 0
+    for i in products: 
+        try:
+            Product_Link = i.find('a',class_="_3TqU78D",href=True)['href']
+            # print(Product_Link)
+            driver.get(Product_Link)
+            htmlSource = driver.page_source
+            soup = BeautifulSoup(htmlSource,'html.parser')
 
-        discount_percent = round((float(old_price)-float(new_price))/float(old_price)*100)
-        discount_percents.append(discount_percent)
-    print(old_prices)
+            product_info = soup.find('div',class_="product-hero").text #soup .find not = None, use if else statement, do an else to find another type of class that can show product info
+            product_info1 = str(product_info).split("\n")
+            while("" in product_info1) :
+                product_info1.remove("")
+            
+            Product_title = product_info1[0]
+
+            product_prices = product_info1[1]
+            prices_list = [float(s) for s in re.findall(r'-?\d+\.?\d*', product_prices)]
+            Old_price = prices_list[0]
+
+            New_price = prices_list[1]
+
+            Discount = abs(prices_list[2])
+
+            Colour = soup.find('span',class_="product-colour").text
+            
+            Product_Descriptions = soup.find("div",class_="product-description")
+            
+            product_description1 = Product_Descriptions.find_all('a',href=True)
+            
+            prdouct_description = []
+            for x in product_description1:
+                prdouct_description.append(x.text)
+            
+            Apparel = prdouct_description[0]
+            Brand = prdouct_description[1]
+
+            Image = soup.find("img",class_="gallery-image")['src']
+            
+            temp = {"author": url, "title":Product_title, "link": Product_Link, "tags": Brand, "scrapedPostImage":Image, "new Price":New_price, "old Price":Old_price, "discount Percent":Discount, "colour":Colour, "apparel":Apparel }
+            TempCollated.append(temp)
+        except Exception as e:
+            error += 1
+            error_Link = i.find('a',class_="_3TqU78D",href=True)['href']
+            error_links.append(error_Link)
+            continue
+
+    print(error_links)
+    print(len(error_links))
+    print(len(TempCollated))
+    print(TempCollated[0])
     driver.close()
     return
+
+scrape_asos_men_bottom()
+
+print("\n")
+
+def scrape_asos_men_footwear():
+    driver = webdriver.Chrome(executable_path=r"D:\DOWNLOADS\ChromeDriver\chromedriver_win32\chromedriver.exe")
+    url = 'https://www.asos.com/men/sale/cat/?cid=8409&currentpricerange=0-725&nlid=mw%7Csale%7Cshop%20sale%20by%20product%7Csale%20view%20all&refine=attribute_10992:61388'
+    driver.get(url)
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36"}
+    r = requests.get(url,headers=headers)
+    
+    driver.maximize_window()
+
+    htmlSource = driver.page_source
+    soup = BeautifulSoup(htmlSource, 'html.parser')
+    
+    reached_page_end = False
+    test_counter_to_remove = 0
+
+    while reached_page_end == False and test_counter_to_remove <=1:
+        for i in range(0,30):
+            ActionChains(driver).send_keys(Keys.PAGE_DOWN).perform()
+        time.sleep(2)
+        if bool(soup.find_all("a",class_="_39_qNys")) == True:
+            driver.find_element_by_class_name('_39_qNys').click()
+            time.sleep(1)
+            test_counter_to_remove +=1
+
+        else:
+            reached_page_end = True
+            
+    htmlSource = driver.page_source
+    soup = BeautifulSoup(htmlSource, 'html.parser')
+
+    sections = soup.find_all("section",class_="_3YREj-P")
+    products = []
+    for i in sections:
+        product = i.find_all("article",class_="_2qG85dG")
+        for z in product:
+            products.append(z)
+
+    TempCollated = []
+    error_links = []
+    error = 0
+    for i in products: 
+        try:
+            Product_Link = i.find('a',class_="_3TqU78D",href=True)['href']
+            # print(Product_Link)
+            driver.get(Product_Link)
+            htmlSource = driver.page_source
+            soup = BeautifulSoup(htmlSource,'html.parser')
+
+            product_info = soup.find('div',class_="product-hero").text #soup .find not = None, use if else statement, do an else to find another type of class that can show product info
+            product_info1 = str(product_info).split("\n")
+            while("" in product_info1) :
+                product_info1.remove("")
+            
+            Product_title = product_info1[0]
+
+            product_prices = product_info1[1]
+            prices_list = [float(s) for s in re.findall(r'-?\d+\.?\d*', product_prices)]
+            Old_price = prices_list[0]
+
+            New_price = prices_list[1]
+
+            Discount = abs(prices_list[2])
+
+            Colour = soup.find('span',class_="product-colour").text
+            
+            Product_Descriptions = soup.find("div",class_="product-description")
+            
+            product_description1 = Product_Descriptions.find_all('a',href=True)
+            
+            prdouct_description = []
+            for x in product_description1:
+                prdouct_description.append(x.text)
+            
+            Apparel = prdouct_description[0]
+            Brand = prdouct_description[1]
+
+            Image = soup.find("img",class_="gallery-image")['src']
+            
+            temp = {"author": url, "title":Product_title, "link": Product_Link, "tags": Brand, "scrapedPostImage":Image, "new Price":New_price, "old Price":Old_price, "discount Percent":Discount, "colour":Colour, "apparel":Apparel }
+            TempCollated.append(temp)
+        except Exception as e:
+            error += 1
+            error_Link = i.find('a',class_="_3TqU78D",href=True)['href']
+            error_links.append(error_Link)
+            continue
+
+    print(error_links)
+    print(len(error_links))
+    print(len(TempCollated))
+    print(TempCollated[0])
+    driver.close()
+    return
+
+scrape_asos_men_footwear()
 
 
 def scrape_forever21():
@@ -131,8 +430,6 @@ def scrape_forever21():
             soup = BeautifulSoup(htmlSource, 'html.parser')
             if soup.find("div",class_="sc-fznxsB kWAcuz sc-fznMAR kvbDRc privy-widget-popup"):
                 driver.find_element_by_css_selector('sc-fzoiQi ozSmQ privy-dismiss-content').click()
-                # closebutton = driver.find_element_by_id("Oval")
-                # closebutton.click()
             else:
                 print("popup not found")    
             
@@ -151,7 +448,6 @@ def scrape_forever21():
     soup = BeautifulSoup(htmlSource, 'html.parser')
 
     products = soup.find_all('div', class_ = "grid-item col-6 col-md-4 col-lg-3")
-    print(len(products))
     titles = []
     ImageLinks = []
     temp_list = []
@@ -194,4 +490,4 @@ def scrape_forever21():
     print(temp_list)
     return
 
-scrape_forever21()
+
